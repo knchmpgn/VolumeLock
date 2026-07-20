@@ -1,0 +1,103 @@
+<Window x:Class="VolumeLock.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:VolumeLock.ViewModels"
+        xmlns:conv="clr-namespace:VolumeLock.Converters"
+        Title="VolumeLock" Height="640" Width="440"
+        MinHeight="420" MinWidth="360"
+        Icon="app.ico"
+        WindowStartupLocation="CenterScreen">
+
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+        <conv:InverseBoolToVisibilityConverter x:Key="InverseBoolToVis"/>
+
+        <DataTemplate DataType="{x:Type vm:AudioItemViewModel}">
+            <Border Style="{StaticResource CardBorderStyle}">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Icon -->
+                    <Border Grid.Row="0" Grid.Column="0" Style="{StaticResource IconContainerStyle}">
+                        <Grid>
+                            <Image Source="{Binding Icon}" Width="32" Height="32"
+                                   Visibility="{Binding HasIcon, Converter={StaticResource BoolToVis}}"/>
+                            <TextBlock Text="{Binding FallbackGlyph}" FontFamily="{StaticResource IconFont}" FontSize="16"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center"
+                                       Foreground="{StaticResource TextSecondaryBrush}"
+                                       Visibility="{Binding HasIcon, Converter={StaticResource InverseBoolToVis}}"/>
+                        </Grid>
+                    </Border>
+
+                    <!-- Name -->
+                    <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding DisplayName}"
+                               VerticalAlignment="Center" Margin="10,0,10,0"
+                               TextTrimming="CharacterEllipsis" FontSize="14"/>
+
+                    <!-- Slider -->
+                    <Slider Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2"
+                            Minimum="0" Maximum="100" Margin="0,10,0,0"
+                            Value="{Binding Volume, Mode=TwoWay}"
+                            IsEnabled="{Binding IsEditable}"/>
+
+                    <!-- Volume number box -->
+                    <TextBox Grid.Row="1" Grid.Column="2" Style="{StaticResource VolumeTextBoxStyle}"
+                             Margin="10,10,0,0"
+                             Text="{Binding VolumeText, UpdateSourceTrigger=LostFocus}"
+                             IsEnabled="{Binding IsEditable}"/>
+
+                    <!-- Lock -->
+                    <Button Grid.Row="1" Grid.Column="3" Style="{StaticResource IconButtonStyle}"
+                            Margin="6,10,0,0"
+                            Command="{Binding ToggleLockCommand}" ToolTip="{Binding LockTooltip}">
+                        <TextBlock Text="{Binding LockGlyph}" FontFamily="{StaticResource IconFont}"/>
+                    </Button>
+                </Grid>
+            </Border>
+        </DataTemplate>
+    </Window.Resources>
+
+    <Grid Margin="16,12,16,16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0" Orientation="Horizontal">
+            <TextBlock Text="VolumeLock" FontSize="20" FontWeight="SemiBold" VerticalAlignment="Center"/>
+        </StackPanel>
+
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Margin="0,4,0,0" Padding="0,0,10,0">
+            <StackPanel Margin="0,0,4,0">
+                <TextBlock Text="Applications" Style="{StaticResource SectionHeaderStyle}"/>
+                <TextBlock Text="Nothing is currently playing audio." Style="{StaticResource EmptySectionStyle}"
+                           Visibility="{Binding ApplicationsEmpty, Converter={StaticResource BoolToVis}}"/>
+                <ItemsControl ItemsSource="{Binding Applications}"/>
+
+                <TextBlock Text="Microphones" Style="{StaticResource SectionHeaderStyle}"/>
+                <TextBlock Text="No microphones were found." Style="{StaticResource EmptySectionStyle}"
+                           Visibility="{Binding MicrophonesEmpty, Converter={StaticResource BoolToVis}}"/>
+                <ItemsControl ItemsSource="{Binding Microphones}"/>
+
+                <TextBlock Text="Settings" Style="{StaticResource SectionHeaderStyle}"/>
+                <Border Style="{StaticResource CardBorderStyle}">
+                    <StackPanel>
+                        <CheckBox Content="Start with Windows"
+                                  IsChecked="{Binding StartAtBoot}" Margin="0,0,0,10"/>
+                        <CheckBox Content="Hide tray icon"
+                                  IsChecked="{Binding HideTrayIcon}"/>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</Window>
