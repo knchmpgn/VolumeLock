@@ -1,0 +1,49 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
+    <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
+    <RootNamespace>VolumeLock</RootNamespace>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <Platforms>x64</Platforms>
+    <RuntimeIdentifiers>win-x64;win-x86;win-arm64</RuntimeIdentifiers>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <UseWinUI>true</UseWinUI>
+    <EnableMsixTooling>true</EnableMsixTooling>
+    <WindowsPackageType>None</WindowsPackageType>
+    <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <ApplicationIcon>app.ico</ApplicationIcon>
+    <AssemblyName>VolumeLock</AssemblyName>
+    <Product>VolumeLock</Product>
+    <AssemblyTitle>VolumeLock</AssemblyTitle>
+    <Description>Locks System Sounds and Microphone volume levels on Windows.</Description>
+    <Version>1.0.0</Version>
+    <Authors>VolumeLock</Authors>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.8.260710003" />
+    <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.26100.7463" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="app.ico">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <EmbeddedResource Include="app.ico" />
+  </ItemGroup>
+
+  <Target Name="PublishPortableSingleFile" AfterTargets="Build" Condition="'$(PortablePublishPass)' != 'true'">
+    <PropertyGroup>
+      <PortableOutputDir>$(MSBuildProjectDirectory)\portable\$(Configuration)</PortableOutputDir>
+    </PropertyGroup>
+    <Exec Command="dotnet publish &quot;$(MSBuildProjectFullPath)&quot; -c &quot;$(Configuration)&quot; -p:Platform=x64 -r win-x64 -p:PortablePublishPass=true -o &quot;$(PortableOutputDir)&quot;" />
+  </Target>
+
+</Project>
