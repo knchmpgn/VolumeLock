@@ -25,7 +25,7 @@ public sealed class SettingsService
 
     public SettingsService()
     {
-        SettingsFilePath = Path.Combine(AppContext.BaseDirectory, "VolumeLock.settings.json");
+        SettingsFilePath = Path.Combine(AppPaths.ExecutableDirectory, "VolumeLock.settings.json");
     }
 
     public void Load()

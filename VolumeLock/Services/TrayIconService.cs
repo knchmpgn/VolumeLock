@@ -36,7 +36,7 @@ public sealed class TrayIconService : IDisposable
         _settingsService = settingsService;
 
         _iconPath = IconHelper.GetIconPath()
-            ?? Path.Combine(AppContext.BaseDirectory, "app.ico");
+            ?? Path.Combine(AppPaths.ExecutableDirectory, "app.ico");
 
         EnsureNativeWindow();
     }
@@ -194,7 +194,7 @@ public sealed class TrayIconService : IDisposable
         {
             int error = Marshal.GetLastWin32Error();
             File.AppendAllText(
-                Path.Combine(AppContext.BaseDirectory, "VolumeLock.log"),
+                Path.Combine(AppPaths.ExecutableDirectory, "VolumeLock.log"),
                 $"[{DateTime.Now:O}] Shell_NotifyIcon({operation}) failed, Win32 error 0x{error:X8}{Environment.NewLine}");
         }
         catch
@@ -208,7 +208,7 @@ public sealed class TrayIconService : IDisposable
         try
         {
             File.AppendAllText(
-                Path.Combine(AppContext.BaseDirectory, "VolumeLock.log"),
+                Path.Combine(AppPaths.ExecutableDirectory, "VolumeLock.log"),
                 $"[{DateTime.Now:O}] {message}{Environment.NewLine}");
         }
         catch

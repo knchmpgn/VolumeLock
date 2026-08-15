@@ -20,7 +20,7 @@ public partial class App : Application
             try
             {
                 File.AppendAllText(
-                    Path.Combine(AppContext.BaseDirectory, "VolumeLock.log"),
+                    Path.Combine(AppPaths.ExecutableDirectory, "VolumeLock.log"),
                     $"[{DateTime.Now:O}] {e.Exception}{Environment.NewLine}");
             }
             catch
