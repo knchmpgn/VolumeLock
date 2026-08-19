@@ -3,8 +3,8 @@ using VolumeLock.CoreAudio;
 namespace VolumeLock.Services;
 
 /// <summary>
-/// Periodically reads the current volume levels and re-applies the user's
-/// locked levels whenever they drift. Also exposed to the UI for "Check now".
+/// Re-applies the user's locked volume levels whenever they drift.
+/// Uses COM callbacks for near-instant detection + a fast polling fallback.
 /// </summary>
 public sealed class AudioLockService : IDisposable
 {
@@ -12,6 +12,7 @@ public sealed class AudioLockService : IDisposable
 
     private readonly SettingsService _settingsService;
     private readonly AudioManager _audio;
+    private readonly Microsoft.UI.Dispatching.DispatcherQueue? _queue;
     private readonly Microsoft.UI.Dispatching.DispatcherQueueTimer? _timer;
     private bool _disposed;
 
@@ -22,27 +23,27 @@ public sealed class AudioLockService : IDisposable
         _settingsService = settingsService;
         _audio = new AudioManager();
 
-        var queue = Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread();
-        if (queue != null)
+        _queue = Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread();
+        if (_queue != null)
         {
-            _timer = queue.CreateTimer();
-            _timer.Interval = TimeSpan.FromSeconds(
-                Math.Max(2, settingsService.Settings.CheckIntervalSeconds));
+            _timer = _queue.CreateTimer();
+            _timer.Interval = TimeSpan.FromMilliseconds(
+                Math.Max(500, settingsService.Settings.CheckIntervalSeconds * 1000));
             _timer.Tick += (s, e) => ApplyNow();
         }
+
+        _audio.MicrophoneVolumeChanged += OnExternalVolumeChange;
+        _audio.SystemSoundsVolumeChanged += OnExternalVolumeChange;
     }
 
     public void Start()
     {
-        var queue = Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread();
-        if (queue != null)
+        _queue?.TryEnqueue(() =>
         {
-            queue.TryEnqueue(() =>
-            {
-                if (!_disposed)
-                    ApplyNow();
-            });
-        }
+            if (_disposed) return;
+            _audio.RegisterCallbacks();
+            ApplyNow();
+        });
 
         _timer?.Start();
     }
@@ -50,6 +51,15 @@ public sealed class AudioLockService : IDisposable
     public void Stop()
     {
         _timer?.Stop();
+    }
+
+    private void OnExternalVolumeChange()
+    {
+        _queue?.TryEnqueue(() =>
+        {
+            if (!_disposed)
+                ApplyNow();
+        });
     }
 
     /// <summary>
@@ -93,6 +103,8 @@ public sealed class AudioLockService : IDisposable
             return;
         }
 
+        _audio.TryRegisterSessionEvents();
+
         if (_settingsService.Settings.SystemSoundsEnabled)
         {
             float target = _settingsService.Settings.SystemSoundsLevel / 100f;
@@ -134,6 +146,9 @@ public sealed class AudioLockService : IDisposable
             return;
         _disposed = true;
         Stop();
+        _audio.MicrophoneVolumeChanged -= OnExternalVolumeChange;
+        _audio.SystemSoundsVolumeChanged -= OnExternalVolumeChange;
+        _audio.UnregisterCallbacks();
         _audio.Dispose();
     }
 }

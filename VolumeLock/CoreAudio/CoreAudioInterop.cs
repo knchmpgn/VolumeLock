@@ -291,3 +291,60 @@ internal struct PROPERTYKEY
     public Guid fmtid;
     public uint pid;
 }
+
+// ------------------------------------------------------------------
+// Callback interfaces for real-time volume change notifications
+// ------------------------------------------------------------------
+
+[StructLayout(LayoutKind.Sequential)]
+internal struct AUDIO_VOLUME_NOTIFICATION_DATA
+{
+    public Guid guidEventContext;
+    public int bMuted;
+    public float MasterVolume;
+    public uint nChannels;
+    [MarshalAs(UnmanagedType.ByValArray, SizeConst = 1)]
+    public float[] afChannelVolumes;
+}
+
+[ComImport]
+[Guid("65D80F57-E2BF-4BB7-8055-34E03AED4609")]
+[InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+internal interface IAudioEndpointVolumeCallback
+{
+    [PreserveSig]
+    int OnNotify(ref AUDIO_VOLUME_NOTIFICATION_DATA pNotify);
+}
+
+[ComImport]
+[Guid("E669C6AD-ADB2-4008-8CC8-5EFEA91AD2BE")]
+[InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+internal interface IAudioSessionNotification
+{
+    [PreserveSig]
+    int OnSessionCreated(IAudioSessionControl NewSession);
+}
+
+[ComImport]
+[Guid("F4B1A599-7266-4319-A8CA-E70ACB11E8CD")]
+[InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+internal interface IAudioSessionEvents
+{
+    [PreserveSig]
+    int OnDisplayNameChanged([MarshalAs(UnmanagedType.LPWStr)] string NewDisplayName, ref Guid EventContext);
+
+    [PreserveSig]
+    int OnIconPathChanged([MarshalAs(UnmanagedType.LPWStr)] string NewIconPath, ref Guid EventContext);
+
+    [PreserveSig]
+    int OnSimpleVolumeChanged(float NewVolume, int NewMute, ref Guid EventContext);
+
+    [PreserveSig]
+    int OnChannelVolumeChanged(uint ChannelCount, IntPtr NewVolumes, uint ChannelIndex, ref Guid EventContext);
+
+    [PreserveSig]
+    int OnGroupingParamChanged(ref Guid NewGroupingParam, ref Guid EventContext);
+
+    [PreserveSig]
+    int OnSessionDisconnected(int DisconnectReason);
+}

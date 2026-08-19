@@ -18,8 +18,23 @@ public sealed class AudioManager : IDisposable
     private const uint COINIT_APARTMENTTHREADED = 0x2;
     private const ushort VT_LPWSTR = 31;
 
+    private static readonly Guid MicEventContext = new("B1E53AAA-1111-4AAA-BBBB-111111111111");
+    private static readonly Guid SysEventContext = new("C2F64BBB-2222-4CCC-DDDD-222222222222");
+
     private readonly bool _ownsCom;
     private IMMDeviceEnumerator? _enumerator;
+    private EndpointVolumeCallback? _endpointCallback;
+    private IAudioEndpointVolume? _callbackEndpoint;
+    private SystemSoundsSessionEvents? _sessionEvents;
+    private IAudioSessionControl2? _registeredSessionControl;
+    private IAudioSessionManager2? _cachedSessionManager;
+    private SystemSoundsSessionNotification? _sessionNotification;
+
+    /// <summary>Raised on a COM thread when the microphone volume changes externally.</summary>
+    public event Action? MicrophoneVolumeChanged;
+
+    /// <summary>Raised on a COM thread when the system sounds volume changes externally.</summary>
+    public event Action? SystemSoundsVolumeChanged;
 
     public AudioManager()
     {
@@ -35,6 +50,7 @@ public sealed class AudioManager : IDisposable
 
     public void Dispose()
     {
+        UnregisterCallbacks();
         _enumerator = null;
         if (_ownsCom)
             NativeMethods.CoUninitialize();
@@ -95,7 +111,7 @@ public sealed class AudioManager : IDisposable
 
                 using (session)
                 {
-                    Guid context = Guid.Empty;
+                    Guid context = SysEventContext;
                     return session.Volume.SetMasterVolume(level, ref context) == 0;
                 }
             }
@@ -155,7 +171,7 @@ public sealed class AudioManager : IDisposable
 
                 using (endpoint)
                 {
-                    Guid context = Guid.Empty;
+                    Guid context = MicEventContext;
                     return endpoint.Volume.SetMasterVolumeLevelScalar(level, ref context) == 0;
                 }
             }
@@ -168,6 +184,177 @@ public sealed class AudioManager : IDisposable
         {
             return false;
         }
+    }
+
+    // ------------------------------------------------------------------
+    // Callback registration
+    // ------------------------------------------------------------------
+
+    public void RegisterCallbacks()
+    {
+        RegisterEndpointVolumeCallback();
+        RegisterSessionNotification();
+        RegisterSessionEvents();
+    }
+
+    /// <summary>
+    /// Attempts to attach <see cref="IAudioSessionEvents"/> to the current system
+    /// sounds session. Safe to call repeatedly; no-ops if already registered.
+    /// </summary>
+    public void TryRegisterSessionEvents()
+    {
+        if (_sessionEvents == null)
+            RegisterSessionEvents();
+    }
+
+    public void UnregisterCallbacks()
+    {
+        if (_endpointCallback != null && _callbackEndpoint != null)
+        {
+            try { _callbackEndpoint.UnregisterControlChangeNotify(_endpointCallback); }
+            catch { }
+            SafeRelease(_callbackEndpoint);
+            _callbackEndpoint = null;
+            _endpointCallback = null;
+        }
+
+        UnregisterSessionEvents();
+
+        if (_sessionNotification != null && _cachedSessionManager != null)
+        {
+            try { _cachedSessionManager.UnregisterSessionNotification(_sessionNotification); }
+            catch { }
+            _sessionNotification = null;
+        }
+
+        if (_cachedSessionManager != null)
+        {
+            SafeRelease(_cachedSessionManager);
+            _cachedSessionManager = null;
+        }
+    }
+
+    private void RegisterEndpointVolumeCallback()
+    {
+        if (_endpointCallback != null) return;
+
+        IMMDevice? device = GetDefaultCaptureDevice();
+        if (device == null) return;
+
+        try
+        {
+            object? epObj = null;
+            try
+            {
+                Guid iid = IID_IAudioEndpointVolume;
+                if (device.Activate(ref iid, CLSCTX_ALL, IntPtr.Zero, out epObj) != 0 || epObj is not IAudioEndpointVolume ep)
+                    return;
+
+                _endpointCallback = new EndpointVolumeCallback();
+                _endpointCallback.VolumeChanged += () => MicrophoneVolumeChanged?.Invoke();
+
+                if (ep.RegisterControlChangeNotify(_endpointCallback) != 0)
+                {
+                    _endpointCallback = null;
+                    return;
+                }
+
+                _callbackEndpoint = ep;
+                epObj = null; // prevent release in finally
+            }
+            finally { SafeRelease(epObj); }
+        }
+        finally { SafeRelease(device); }
+    }
+
+    private void RegisterSessionEvents()
+    {
+        UnregisterSessionEvents();
+
+        IMMDevice? device = GetDefaultRenderDevice();
+        if (device == null) return;
+
+        try
+        {
+            var session = FindSystemSoundsSession(device);
+            if (session == null) { SafeRelease(device); return; }
+
+            try
+            {
+                _sessionEvents = new SystemSoundsSessionEvents();
+                _sessionEvents.VolumeChanged += () => SystemSoundsVolumeChanged?.Invoke();
+
+                int hr = session.Control.RegisterAudioSessionNotification(_sessionEvents);
+                if (hr == 0)
+                {
+                    _registeredSessionControl = session.Control;
+                    session.Control = null!; // prevent release in Dispose
+                }
+                else
+                {
+                    _sessionEvents = null;
+                }
+            }
+            finally
+            {
+                session.Dispose();
+            }
+        }
+        finally { SafeRelease(device); }
+    }
+
+    private void UnregisterSessionEvents()
+    {
+        if (_sessionEvents != null && _registeredSessionControl != null)
+        {
+            try { _registeredSessionControl.UnregisterAudioSessionNotification(_sessionEvents); }
+            catch { }
+            SafeRelease(_registeredSessionControl);
+            _sessionEvents = null;
+        }
+    }
+
+    private void RegisterSessionNotification()
+    {
+        if (_sessionNotification != null) return;
+
+        var manager = GetOrCreateSessionManager();
+        if (manager == null) return;
+
+        _sessionNotification = new SystemSoundsSessionNotification();
+        _sessionNotification.SessionCreated += () => SystemSoundsVolumeChanged?.Invoke();
+
+        if (manager.RegisterSessionNotification(_sessionNotification) != 0)
+        {
+            _sessionNotification = null;
+        }
+    }
+
+    private IAudioSessionManager2? GetOrCreateSessionManager()
+    {
+        if (_cachedSessionManager != null)
+            return _cachedSessionManager;
+
+        IMMDevice? device = GetDefaultRenderDevice();
+        if (device == null) return null;
+
+        try
+        {
+            object? managerObj = null;
+            try
+            {
+                Guid iid = IID_IAudioSessionManager2;
+                if (device.Activate(ref iid, CLSCTX_ALL, IntPtr.Zero, out managerObj) != 0)
+                    return null;
+
+                _cachedSessionManager = managerObj as IAudioSessionManager2;
+                if (_cachedSessionManager != null)
+                    managerObj = null; // prevent release in finally
+                return _cachedSessionManager;
+            }
+            finally { SafeRelease(managerObj); }
+        }
+        finally { SafeRelease(device); }
     }
 
     // ------------------------------------------------------------------
@@ -392,7 +579,7 @@ public sealed class AudioManager : IDisposable
             Volume = volume;
         }
 
-        public IAudioSessionControl2 Control { get; }
+        public IAudioSessionControl2 Control { get; set; }
         public ISimpleAudioVolume Volume { get; }
 
         public void Dispose()
@@ -414,6 +601,77 @@ public sealed class AudioManager : IDisposable
         public void Dispose()
         {
             SafeRelease(Volume);
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // COM callback implementations
+    // ------------------------------------------------------------------
+
+    [ComVisible(true)]
+    [ClassInterface(ClassInterfaceType.None)]
+    private sealed class EndpointVolumeCallback : IAudioEndpointVolumeCallback
+    {
+        public event Action? VolumeChanged;
+
+        [PreserveSig]
+        int IAudioEndpointVolumeCallback.OnNotify(ref AUDIO_VOLUME_NOTIFICATION_DATA pData)
+        {
+            if (pData.guidEventContext != MicEventContext)
+                VolumeChanged?.Invoke();
+            return 0;
+        }
+    }
+
+    [ComVisible(true)]
+    [ClassInterface(ClassInterfaceType.None)]
+    private sealed class SystemSoundsSessionEvents : IAudioSessionEvents
+    {
+        private static readonly Guid IgnoreContext = SysEventContext;
+
+        public event Action? VolumeChanged;
+
+        [PreserveSig]
+        int IAudioSessionEvents.OnDisplayNameChanged([MarshalAs(UnmanagedType.LPWStr)] string NewDisplayName, ref Guid EventContext) => 0;
+
+        [PreserveSig]
+        int IAudioSessionEvents.OnIconPathChanged([MarshalAs(UnmanagedType.LPWStr)] string NewIconPath, ref Guid EventContext) => 0;
+
+        [PreserveSig]
+        int IAudioSessionEvents.OnSimpleVolumeChanged(float NewVolume, int NewMute, ref Guid EventContext)
+        {
+            if (EventContext != IgnoreContext)
+                VolumeChanged?.Invoke();
+            return 0;
+        }
+
+        [PreserveSig]
+        int IAudioSessionEvents.OnChannelVolumeChanged(uint ChannelCount, IntPtr NewVolumes, uint ChannelIndex, ref Guid EventContext) => 0;
+
+        [PreserveSig]
+        int IAudioSessionEvents.OnGroupingParamChanged(ref Guid NewGroupingParam, ref Guid EventContext) => 0;
+
+        [PreserveSig]
+        int IAudioSessionEvents.OnSessionDisconnected(int DisconnectReason) => 0;
+    }
+
+    [ComVisible(true)]
+    [ClassInterface(ClassInterfaceType.None)]
+    private sealed class SystemSoundsSessionNotification : IAudioSessionNotification
+    {
+        public event Action? SessionCreated;
+
+        [PreserveSig]
+        int IAudioSessionNotification.OnSessionCreated(IAudioSessionControl NewSession)
+        {
+            try
+            {
+                var control2 = NewSession as IAudioSessionControl2;
+                if (control2 != null && control2.IsSystemSoundsSession() == 0)
+                    SessionCreated?.Invoke();
+            }
+            catch { }
+            return 0;
         }
     }
 }
