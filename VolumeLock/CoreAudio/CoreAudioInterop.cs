@@ -68,10 +68,10 @@ internal interface IMMDevice
 internal interface IAudioEndpointVolume
 {
     [PreserveSig]
-    int RegisterControlChangeNotify([MarshalAs(UnmanagedType.IUnknown)] object pNotify);
+    int RegisterControlChangeNotify(IAudioEndpointVolumeCallback pNotify);
 
     [PreserveSig]
-    int UnregisterControlChangeNotify([MarshalAs(UnmanagedType.IUnknown)] object pNotify);
+    int UnregisterControlChangeNotify(IAudioEndpointVolumeCallback pNotify);
 
     [PreserveSig]
     int GetChannelCount(out uint pnChannelCount);
@@ -139,10 +139,10 @@ internal interface IAudioSessionManager2
     int GetSessionEnumerator(out IAudioSessionEnumerator sessionEnum);
 
     [PreserveSig]
-    int RegisterSessionNotification([MarshalAs(UnmanagedType.IUnknown)] object sessionNotification);
+    int RegisterSessionNotification(IAudioSessionNotification sessionNotification);
 
     [PreserveSig]
-    int UnregisterSessionNotification([MarshalAs(UnmanagedType.IUnknown)] object sessionNotification);
+    int UnregisterSessionNotification(IAudioSessionNotification sessionNotification);
 
     [PreserveSig]
     int RegisterDuckNotification([MarshalAs(UnmanagedType.LPWStr)] string sessionId, [MarshalAs(UnmanagedType.IUnknown)] object duckNotification);
@@ -190,10 +190,10 @@ internal interface IAudioSessionControl
     int SetGroupingParam(ref Guid overrideValue, ref Guid eventContext);
 
     [PreserveSig]
-    int RegisterAudioSessionNotification([MarshalAs(UnmanagedType.IUnknown)] object newNotifications);
+    int RegisterAudioSessionNotification(IAudioSessionEvents newNotifications);
 
     [PreserveSig]
-    int UnregisterAudioSessionNotification([MarshalAs(UnmanagedType.IUnknown)] object newNotifications);
+    int UnregisterAudioSessionNotification(IAudioSessionEvents newNotifications);
 }
 
 [ComImport]
@@ -224,10 +224,10 @@ internal interface IAudioSessionControl2
     int SetGroupingParam(ref Guid overrideValue, ref Guid eventContext);
 
     [PreserveSig]
-    int RegisterAudioSessionNotification([MarshalAs(UnmanagedType.IUnknown)] object newNotifications);
+    int RegisterAudioSessionNotification(IAudioSessionEvents newNotifications);
 
     [PreserveSig]
-    int UnregisterAudioSessionNotification([MarshalAs(UnmanagedType.IUnknown)] object newNotifications);
+    int UnregisterAudioSessionNotification(IAudioSessionEvents newNotifications);
 
     // IAudioSessionControl2 (derived)
     [PreserveSig]
@@ -326,7 +326,7 @@ internal interface IAudioSessionNotification
 }
 
 [ComImport]
-[Guid("F4B1A599-7266-4319-A8CA-E70ACB11E8CD")]
+[Guid("24918ACC-64B3-37C1-8CA9-74A66E9957A8")]
 [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
 internal interface IAudioSessionEvents
 {

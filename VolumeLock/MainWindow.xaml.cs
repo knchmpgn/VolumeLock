@@ -228,16 +228,16 @@ public sealed partial class MainWindow : Window
     private void UpdateEnabledStates()
     {
         bool systemLocked = _settingsService.Settings.SystemSoundsEnabled;
-        SystemSoundsLockIcon.Glyph = systemLocked ? UnlockGlyph : LockGlyph;
-        ToolTipService.SetToolTip(SystemSoundsLockButton, systemLocked ? "Unlocked" : "Locked");
-        AutomationProperties.SetName(SystemSoundsLockButton, systemLocked ? "System sounds unlocked" : "System sounds locked");
+        SystemSoundsLockIcon.Glyph = systemLocked ? LockGlyph : UnlockGlyph;
+        ToolTipService.SetToolTip(SystemSoundsLockButton, systemLocked ? "Locked" : "Unlocked");
+        AutomationProperties.SetName(SystemSoundsLockButton, systemLocked ? "System sounds locked" : "System sounds unlocked");
         SystemSoundsSlider.IsEnabled = systemLocked;
         SystemSoundsNumberBox.IsEnabled = systemLocked;
 
         bool micLocked = _settingsService.Settings.MicrophoneEnabled;
-        MicrophoneLockIcon.Glyph = micLocked ? UnlockGlyph : LockGlyph;
-        ToolTipService.SetToolTip(MicrophoneLockButton, micLocked ? "Unlocked" : "Locked");
-        AutomationProperties.SetName(MicrophoneLockButton, micLocked ? "Microphone unlocked" : "Microphone locked");
+        MicrophoneLockIcon.Glyph = micLocked ? LockGlyph : UnlockGlyph;
+        ToolTipService.SetToolTip(MicrophoneLockButton, micLocked ? "Locked" : "Unlocked");
+        AutomationProperties.SetName(MicrophoneLockButton, micLocked ? "Microphone locked" : "Microphone unlocked");
         MicrophoneSlider.IsEnabled = micLocked;
         MicrophoneNumberBox.IsEnabled = micLocked;
     }

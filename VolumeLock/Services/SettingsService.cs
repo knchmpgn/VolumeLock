@@ -10,7 +10,7 @@ public sealed class AppSettings
     public int MicrophoneLevel { get; set; } = 80;
     public bool RunAtStartup { get; set; }
     public bool HideTrayIcon { get; set; }
-    public int CheckIntervalSeconds { get; set; } = 5;
+    public int CheckIntervalSeconds { get; set; } = 3;
 }
 
 /// <summary>
